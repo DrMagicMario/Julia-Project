@@ -5,8 +5,10 @@ Pkg.add("ImageView")
 Pkg.add("TestImages")
 Pkg.add("QuartzImageIO")
 Pkg.add("ImageMagick")
+Pkg.add("StaticArrays")
+Pkg.add("Rotations")
 
-using Images, TestImages, ImageView, ImageMetadata, CoordinateTransformations
+using Images, TestImages, ImageView, ImageMetadata, CoordinateTransformations, Rotations, StaticArrays
 
 #loading image
 img = testimage("mandrill")
@@ -36,10 +38,11 @@ imshow(resized_img)
 resized_img = restrict(img,1);
 imshow(resized_img)
 
+#rotating images
+tfm = LinearMap(RotMatrix(-pi))
+resized_img = warp(img,tfm)
+imshow(img)
+
 while (true)
 sleep(1)
 end
-##rotating images
-##tfm = LinearMap(RotMatrix(-pi/4))
-##resized_img = warp(img,tfm)
-##imshow(img)
