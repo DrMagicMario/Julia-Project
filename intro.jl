@@ -118,7 +118,7 @@ foo()=1
 
 println(@doc foo) #@doc macro before function for more info
 
-#Julia is fast
+#Julia is fast -> lazer beem
 
 data = rand(Float64,10^7)
 
@@ -189,7 +189,7 @@ points = [Point(rand(),rand()) for _ in 1:10^7];
 println(@btime julia_sum($points)) #you can use your generic functions with any structs with negligible overhead 
 
 
-#Julia supporst Async/Sync cooperative tasks: great for IO and network requests
+#Julia supports Async/Sync cooperative tasks: great for IO and network requests
 Pkg.add("HTTP")
 using HTTP: request
 
@@ -229,8 +229,92 @@ end
 x = [1,2,3]
 println(@btime invert!($x))
 
+#Julia has no rules restricting what can be a variable and what can be passed to a function => Everything in Julia is a Value (functions, variables, types, expressions)
+#making higher-order functions is trivial
+function map_reduce(operator,reduction,array,init_val)
+	result = init_val
+	@inbounds @simd for item in array
+		result = reduction(result,operator(item))
+	end
+	return result
+end
 
- 
+println(map_reduce(sin,+,[1,2,3,4], 0))
+
+#variables are values
+fancy_sum(x) = map_reduce(identity,+,x,zero(eltype(x))) 
+
+println(@btime fancy_sum($data)) #no penalty!
+
+#types are values
+function empty_matrix(T::Type, rows::Integer, cols::Integer)
+	return zeros(T,rows,cols)	
+end
+
+println(empty_matrix(Int,3,3))
+
+#expressions are values
+expr = :(1+2)
+println(expr.head)
+println(expr.args)
+
+#metaprogramming: easily write functions to manipulate expressions
+switch_to_subtraction!(x::Any) = nothing
+
+"""
+Change all +'s to -'s
+""" 
+
+function switch_to_subtraction!(ex::Expr)
+	if ex.head == :call && ex.args[1] == :(+)
+		ex.args[1]= :(-)
+	end
+	for i in 2:length(ex.args)
+		switch_to_subtraction!(ex.args[i])
+	end
+	return ex
+end
+
+expr = :((1+2)*(3+4)*sqrt(2))
+println(switch_to_subtraction!(expr))
+
+#macros can easily be written in Julia: just like a Julia function. Macros run on the expression
+"""
+replace strings in expression with "cat"
+"""
+macro more_cats(expr)
+	for i in eachindex(expr.args)
+		if expr.args[i] isa String
+			expr.args[i] = "cat"
+		end
+	end
+	return esc(expr)
+end
+
+@more_cats println("hello world") #macros are called with @
+
+println(@macroexpand @more_cats println("hello world")) #simliar to @doc for macros
+
+#Some useful Macros
+#@show: print variable and its value
+x=5
+@show x
+
+#@time: measure time elapsed of expression to return result
+@time sqrt(big(pi)) 
+
+#@showprogress: times each iteration of loop and estimates time left
+Pkg.add("ProgressMeter")
+using ProgressMeter: @showprogress
+@showprogress for i in 1:100
+	sum(rand(10^7))
+end
+
+#important packages for ML/ data science
+#Flux.jl, DifferentialEquations.jl, DataFrames.jl, JuMP.jl
+
+
+#we can define a sum function in terms of our map reduce function
 #calling c funcitons: currently not supported on macOS
 #"""
 #calls the strcomp fucntion from libc.so.6
