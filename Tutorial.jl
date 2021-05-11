@@ -5,4 +5,4 @@ Pkg.add("IJulia")
 
 using IJulia, Knet
 
-notebook(dir=Knet.dir("dl-tutorial"))
+notebook(dir=Knet.dir("Tutorial"))
