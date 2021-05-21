@@ -79,10 +79,16 @@ h(p,t;idxs=1) = 1.0
 p = [1.5,1.0,3.0,1.0]
 
 prob = DDEProblem(latka_volterra!,u_not,h,tspan,p,constant_lag = [tau]) #Delay Differential Equation. 
-@time sol = solve(prob)
+@time sol = solve(prob, Tsit5(), dense=false)
+
+#display(plot(sol))
+
+rabbit_condition(u,t,integrator) = u[2]-4
+rabbit_affect!(integrator) = integrator.u[2] -= 1
+rabbit_cb = ContinuousCallback(rabbit_condition, rabbit_affect!)
+@time sol = solve(prob, callback = rabbit_cb)
 
 display(plot(sol))
-
 #u_prime = f(u)
 #u(0) = u_not
 
