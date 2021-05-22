@@ -60,35 +60,48 @@ p = [1.5,1.0,3.0,1.0]
 
 
 prob = SDEProblem(latka_volterra!,multiplicative_noise!,u_not,tspan,p)
-@time sol = solve(prob) #automatically chooses best method to solve
+#@time sol = solve(prob) #automatically chooses best method to solve
+
+#model inference 
+#original model
+prob = ODEProblem(latka_volterra!,u_not,tspan,p)
+@time sol = solve(prob,saveat=0.1)
+dataset = Array(sol)
+display(scatter!(sol.t, dataset')) 
+
+
+#new model
+tmp_prob = remake(prob,p=[1.2,0.8,2.5,0.8]) #solve porblems using modified the inputs
+@time tmp_sol = solve(tmp_prob,saveat=0.1) #set timestep 
+tmp_dataset = Array(tmp_sol)
+display(scatter!(tmp_sol.t,tmp_dataset')) 
+#how do we get original model parameters? Compare two datasets and compute differences at each point
+
 
 #display(plot(sol))
 #display(plot(sol, vars=[1,2]))
 
 ensembleprob = EnsembleProblem(prob) #solve an SDE over multiple trajectories and summarizes the findings
-@time sol = solve(ensembleprob, SOSRI(), EnsembleThreads(), trajectories=1000) #specifies which method to use (SOSRI = stiff awareness); use all available threads (EnsembleThreads(); # of trajectories) 
+#@time sol = solve(ensembleprob, SOSRI(), EnsembleThreads(), trajectories=1000) #specifies which method to use (SOSRI = stiff awareness); use all available threads (EnsembleThreads(); # of trajectories) 
 
 #display(plot(sol))
-@time sumn = EnsembleSummary(sol)
+#@time sumn = EnsembleSummary(sol)
 #display(plot(sumn))
 
-u_not = [1.0,1.0]
-tspan = (0.0,10.0)
-h(p,t) = [1.0,1.0]
-h(p,t;idxs=1) = 1.0
-p = [1.5,1.0,3.0,1.0]
+h(p,t)=[1.0,1.0]
+h(p,t;idxs=1)=1.0
 
 prob = DDEProblem(latka_volterra!,u_not,h,tspan,p,constant_lag = [tau]) #Delay Differential Equation. 
-@time sol = solve(prob, Tsit5(), dense=false)
+#@time sol = solve(prob, Tsit5(), dense=false)
 
 #display(plot(sol))
 
 rabbit_condition(u,t,integrator) = u[2]-4
 rabbit_affect!(integrator) = integrator.u[2] -= 1
 rabbit_cb = ContinuousCallback(rabbit_condition, rabbit_affect!)
-@time sol = solve(prob, callback = rabbit_cb)
+#@time sol = solve(prob, callback = rabbit_cb)
 
-display(plot(sol))
+#display(plot(sol))
 #u_prime = f(u)
 #u(0) = u_not
 
