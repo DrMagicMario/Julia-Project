@@ -10,12 +10,16 @@ Multi-line comment
 
 import Pkg
 Pkg.activate(".")
-#Pkg.add("BenchmarkTools")
-#Pkg.add("Colors")
-#Pkg.add("Plots")
-#Pkg.add("Example")
+#Pkg.add.(["BenchmarkTools", "Colors", "Plots", "Example","Libdl","Statistics","PyCall","Conda"])
+#Pkg.update();Pkg.build(); precompile;
 Pkg.instantiate()
-using BenchmarkTools, Colors, Plots, Example, ImageView
+using BenchmarkTools, Colors, Plots, Example, ImageView, Libdl, Statistics, PyCall #, Conda
+
+#= need this for PyCall to work
+Conda.add("nomkl")
+Conda.add("scikit-learn")
+Conda.rm("mkl")
+=#
 
 #how to print
 println("Julia 1.0 introduction...", 69)
@@ -37,8 +41,8 @@ dog = -1
 println(cat+dog==bunny)
 
 #Syntax for basic math
-sum = 3+7; difference = 10 - 3; product = 20*5; quotient = 100/10; power = 10^2; modulus= 100%2;
-@show sum; @show difference; @show product; @show quotient; @show power; @show modulus;
+mysum = 3+7; difference = 10 - 3; product = 20*5; quotient = 100/10; power = 10^2; modulus= 100%2;
+@show mysum; @show difference; @show product; @show quotient; @show power; @show modulus;
 
 #=
 Strings
@@ -462,16 +466,124 @@ numpirates = [45000, 20000, 15000, 5000, 400, 17]
 @show numpirates
 
 gr()
+function plot1()  
+  display(plot(numpirates, glob_temps, label="line"))
+  #the '!' indicates a mutating functione
+  display(scatter!(numpirates, glob_temps, label="points")) #points will be added to existing plot
+  display(xlabel!("Number of Pirates (Approximate)"))
+  display(ylabel!("Global Temperature(C)"))
+  display(title!("Influence of pirate population on global warming"))
+  display(xflip!())
+end
+
+#@time plot1()
+
+#=
+using a different backend for plotting
+  - unicodeplots()
+  - pyplot(): broken ->  'INTEL MKL ERROR: Cannot load libmkl_intel_thread.1.dylib.'
+
+pyplot()
 display(plot(numpirates, glob_temps, label="line"))
 #the '!' indicates a mutating functione
 display(scatter!(numpirates, glob_temps, label="points")) #points will be added to existing plot
-xlabel!("Number of Pirates (Approximate)")
-ylabel!("Global Temperature(C)")
-title!("Influence of pirate population on global warming")
+display(xlabel!("Number of Pirates (Approximate)"))
+display(ylabel!("Global Temperature(C)"))
+display(title!("Influence of pirate population on global warming"))
+=#
 
+function plot2()
+  x = -10:10
+  p1 = plot(x,x)
+  p2 = plot(x,x.^2)
+  p3 = plot(x,x.^3)
+  p4 = plot(x,x.^4)
+  display(plot(p1,p2,p3,p4,layout=(2,2),legend=false))
+end
+
+#@time plot2()
+
+#=
+  Julia is Fast!
+=#
+println("\n"^5)
+
+bignum = rand(10^7) #1D vector of 10^7 random numbers, bwtween [0,1]
+
+################################# Julia #########################################
+j_bench = @benchmark sum($bignum)
+@show j_bench
+@show sum(bignum)
+################################### C ##########################################
+
+C_code = """
+#include <stddef.h>
+double c_sum(size_t n, double *x){
+  double s = 0.0;
+  for (size_t i = 0; i<n; ++i){
+    s += x[i];
+  }
+  return s;
+}
+""";
+
+const Clib = tempname() * "." * Libdl.dlext #make temporary file
+
+#compile to a shared library by pipelining C_code to gcc -> need gcc installed
+#using -ffast-math -> vectorized FLOPS (SIMD instructions)
+open(`gcc -fPIC -O3 -msse3 -xc -shared -ffast-math -o $(Clib) -`, "w") do cmd 
+  print(cmd,C_code)
+end
+
+#define julia function to call C function
+c_sum(x::Array{Float64}) = ccall(("c_sum",Clib), Float64, (Csize_t, Ptr{Float64}), length(x), x)
+
+c_bench = @benchmark c_sum($bignum)
+@show c_bench
+@show c_sum(bignum)
+
+################################ Python ####################################
+
+#built in sum function
+py_sum = pybuiltin("sum")
+
+py_bench = @benchmark py_sum($bignum)
+@show py_bench
+@show py_sum(bignum)
+
+
+################################ Summary ##################################
+
+d = Dict()
+d["C_sum"] = minimum(c_bench.times)/ 1e6 #milliseconds 
+d["J_sum"] = minimum(j_bench.times)/1e6
+d["Py_sum"] = minimum(py_bench.times)/1e6
+@show d
+
+gr()
+t = c_bench.times / 1e6 #milliseconds
+m,sigma = minimum(t), std(t)
+
+t2 = j_bench.times / 1e6 #milliseconds
+m2,sigma2 = minimum(t2), std(t2)
+
+t3 = py_bench.times / 1e6 #milliseconds
+m3,sigma3 = minimum(t3), std(t3)
+
+h = histogram(t, bins=500, xlim=(m-0.01,m+sigma), xlabel="milliseconds", ylabel="count",label="",title = "C_bench")
+h2 = histogram(t2, bins=500, xlim=(m2-0.01,m2+sigma2), xlabel="milliseconds", ylabel="count",label="", title = "J_bench")
+h3 = histogram(t3, bins=500, xlim=(m3-0.01,m3+sigma3), xlabel="milliseconds", ylabel="count",label="",title = "Py_bench")
+
+display(plot(h,h2,h3,layout=(3,1),legend=false))
+
+println("are all the sums the same?: $(c_sum(bignum) == sum(bignum) == pysum(bignum))")
+println("difference between c_sum and j_sum: $(c_sum(bignum) - sum(bignum))")
+println("difference between c_sum and py_sum: $(c_sum(bignum) - py_sum(bignum))")
+println("difference between j_sums and py_sum: $(sum(bignum) - py_sum(bignum))")
+println("done")
 while true
+  #exit()
   sleep(1)
 end
 
 
-println("done")
