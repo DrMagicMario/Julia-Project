@@ -1,4 +1,6 @@
 #!/usr/local/bin/julia
+#src: https://www.youtube.com/watch?v=8h8rQyEpiZA&list=WL&index=3&t=2959s
+
 
 #single-line comment
 
@@ -8,7 +10,12 @@ Multi-line comment
 
 import Pkg
 Pkg.activate(".")
+#Pkg.add("BenchmarkTools")
+#Pkg.add("Colors")
+#Pkg.add("Plots")
+#Pkg.add("Example")
 Pkg.instantiate()
+using BenchmarkTools, Colors, Plots, Example, ImageView
 
 #how to print
 println("Julia 1.0 introduction...", 69)
@@ -208,5 +215,263 @@ end
 
 ############################ for ############################ 
 println("\n"^5)
+
+#=
+for var in loop_iterable
+  loop body
+end
+=#
+
+for n in 1:2:10 #steps of size 2 between 1-10
+  println(n)
+end
+
+newfriends = ["Sonya","Derbatov", "Rooney", "Asimov"]
+for friend in newfriends
+  println("Hi $friend, it's great to see you")
+end
+
+#addition tables - entry is sum of its row and column indices
+m,n= 5, 5
+A = fill(0,(m,n))
+@show A
+
+for i in 1:n
+  for j in 1:m
+    A[i,j] = i+j
+  end
+end
+@show A
+
+#cool syntax
+B = fill(0,(m,n))
+for i in 1:n, j in 1:m
+  B[i,j]=i+j
+end
+@show B
+
+#cool-er syntax - list comprehensions
+C = [i+j for i in 1:n, j in 1:m] #loop body to the left of loop declaration
+@show C
+
+println("A, B and C are the same?: $(A==B==C)")
+
+#=
+Conditionals - if 
+
+syntax: 
+if cond_1
+  option 1
+elseif cond_2
+  option 2
+else 
+  option 3
+end
+
+=#
+println("\n"^5)
+
+#FizzBuzz test
+N = rand(1:100000)
+if(N%3==0) && (N%5==0) # '&&' = and
+  println("FizzBuzz")
+elseif N%3==0
+  println("Fizz")
+elseif N%5==0
+  println("Buzz")
+else
+  println(N)
+end
+
+#= FizzBuzz test with ternary operators
+
+syntax:
+a ? b : c
+
+equivalent to:
+if a
+  b
+else 
+  c
+end
+
+=#
+
+x = rand(1:100)
+y = rand(1:100)
+
+@time begin
+if x>y
+  println(x)
+else
+  println(y)
+end
+end
+
+@time begin
+println(x>y ? x : y)
+end
+
+#short-circuit evaluation
+#=
+norm:
+a & b
+
+Short-circuit syntax:
+a && b 
+a || b
+
+Motivation:
+we shouldnt waste our time checking b if a is false
+=#
+
+@time false & (println("ampersand"); true) # evaluates b and prints 
+
+@time false && (println("sc_ampersand"); true) # 0.0000 sec!
+@time true && (println("sc_ampersand"); true) 
+
+#if a is true julia will just evaluate and return b, even if its an error.
+#x>0 && error("x cannot be greater than 0!")
+
+# same thing with or
+@time true || println("sc_or") # 0.0000 sec!
+@time false || println("sc_or") 
+
+#=
+Functions - how to declare a function
+          - Duck-typing
+          - Mutating vs non-mutating functions
+          - Higer order functions
+=#
+
+############################## declare a function #########################
+println("\n"^5)
+
+#option 1
+function sayhi(name)
+  println("Hi $name, nice to meet you")
+end
+
+function f(x)
+  x^2
+end
+
+sayhi("looloo")
+@show f(42)
+
+#option2
+sayhi2(name) = println("Hi $name. nice to meet you")
+f2(x) = x^2
+sayhi2("Ivac")
+@show f2(42)
+
+#option 3 - anonymous functions (lambda)
+sayhi3 = name -> println("Hi $name, nice to meet you") #bind variable for later access 
+f3 = x -> x^2
+sayhi3("Kilo")
+@show f3(42)
+
+############################## duck typing ###################################
+#=
+Julia functions work on whatever inouts make sense
+=#
+
+sayhi(1337) #string interpolation defined for an int
+A = rand(3,3)
+f(A) # matrix operation ^ defined
+f("hi") # ^ = string concat 
+#f() will not work on a vector since ^ is not defined. 
+v = rand(3)
+#f(v)
+
+############################## mutating vs non-mutating  ###################################
+#=
+Convention: functions followed by ! alter the contents of inputs
+=#
+
+v = [3,5,2]
+@show sort(v)
+@show v
+@show sort!(v)
+@show v
+
+
+############################## Higher order functions  ###################################
+#=
+function that takes functions as arguments.
+
+Map: applies a function to every element of the data structure passed to it
+syntax:
+  map(f, [1,2,3]) -> [f(1),f(2),f(3)]
+
+Broadcast: generalization of map -> expands unary dimensions (dont need same size/type elements)
+syntax:
+  broadcast(f,[1,2,3])
+  f.([1,2,3])
+=#
+
+@time begin
+@show map(f,[1,2,3])
+
+#using anon. functions
+@show map(x->x^3, [1,2,3])
+end
+
+@time begin
+@show broadcast(f,[1,2,3])
+@show f.([1,2,3])
+end
+
+println()
+R = [i+3*j for j in 0:2, i in 1:3]
+@show f(R) #R*R
+@show f.(R) #element wise ^2
+
+#dot operator for broadcasting
+println()
+dot_op = R .+ 2 .* f.(R) ./ R
+@show dot_op
+brdcst = broadcast(x -> x+2*f(x)/x,R)
+@show brdcst
+println("dot_op = brdcst?: $(brdcst == dot_op)")
+
+#=
+Packages 
+=#
+println("\n"^5)
+
+#Example.jl
+hello("it's me mario")
+
+palette = distinguishable_colors(100) #Colors.jl
+@show palette; println()  #Plot.jl
+
+#randomly checkered matrix 
+@show rand(palette, 3, 3)
+
+#=
+Plotting - calling PyPlot
+         - Plots.jl -> lets you specify which backend to use
+=#
+println("\n"^5)
+
+glob_temps = [14.4, 14.5, 14.8, 15.2, 15.5, 15.8]
+numpirates = [45000, 20000, 15000, 5000, 400, 17]
+
+@show glob_temps
+@show numpirates
+
+gr()
+display(plot(numpirates, glob_temps, label="line"))
+#the '!' indicates a mutating functione
+display(scatter!(numpirates, glob_temps, label="points")) #points will be added to existing plot
+xlabel!("Number of Pirates (Approximate)")
+ylabel!("Global Temperature(C)")
+title!("Influence of pirate population on global warming")
+
+while true
+  sleep(1)
+end
+
 
 println("done")
