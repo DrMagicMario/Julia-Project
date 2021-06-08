@@ -10,12 +10,13 @@ Multi-line comment
 
 import Pkg
 Pkg.activate(".")
-#Pkg.add.(["BenchmarkTools", "Colors", "Plots", "Example","Libdl","Statistics","PyCall","Conda"])
+#Pkg.add.(["BenchmarkTools", "Colors", "Plots", "Example","Libdl","Statistics","PyCall","Conda","LinearAlgebra"])
 #Pkg.update();Pkg.build(); precompile;
 Pkg.instantiate()
-using BenchmarkTools, Colors, Plots, Example, ImageView, Libdl, Statistics, PyCall #, Conda
+using BenchmarkTools, Colors, Plots, Example, ImageView, Libdl, Statistics, PyCall, Conda, LinearAlgebra
 
 #= need this for PyCall to work
+#Conda.add("numpy")
 Conda.add("nomkl")
 Conda.add("scikit-learn")
 Conda.rm("mkl")
@@ -511,8 +512,8 @@ println("\n"^5)
 bignum = rand(10^7) #1D vector of 10^7 random numbers, bwtween [0,1]
 
 ################################# Julia #########################################
-j_bench = @benchmark sum($bignum)
-@show j_bench
+#j_bench = @benchmark sum($bignum)
+#@show j_bench
 @show sum(bignum)
 ################################### C ##########################################
 
@@ -538,8 +539,8 @@ end
 #define julia function to call C function
 c_sum(x::Array{Float64}) = ccall(("c_sum",Clib), Float64, (Csize_t, Ptr{Float64}), length(x), x)
 
-c_bench = @benchmark c_sum($bignum)
-@show c_bench
+#c_bench = @benchmark c_sum($bignum)
+#@show c_bench
 @show c_sum(bignum)
 
 ################################ Python ####################################
@@ -547,17 +548,23 @@ c_bench = @benchmark c_sum($bignum)
 #built in sum function
 py_sum = pybuiltin("sum")
 
-py_bench = @benchmark py_sum($bignum)
-@show py_bench
+#py_bench = @benchmark py_sum($bignum)
+#@show py_bench
 @show py_sum(bignum)
 
+#numpy
+numpy_sum = pyimport("numpy")["sum"]
+#py_numpy_bench = @benchmark numpy_sum($bignum)
+#@show py_numpy_bench
+@show numpy_sum(bignum)
 
 ################################ Summary ##################################
-
+#=
 d = Dict()
 d["C_sum"] = minimum(c_bench.times)/ 1e6 #milliseconds 
 d["J_sum"] = minimum(j_bench.times)/1e6
 d["Py_sum"] = minimum(py_bench.times)/1e6
+d["Numpy_sum"] = minimum(py_numpy_bench.times)/1e6
 @show d
 
 gr()
@@ -570,20 +577,198 @@ m2,sigma2 = minimum(t2), std(t2)
 t3 = py_bench.times / 1e6 #milliseconds
 m3,sigma3 = minimum(t3), std(t3)
 
+t4 = py_numpy_bench.times / 1e6 #milliseconds
+m4,sigma4 = minimum(t4), std(t4)
+
 h = histogram(t, bins=500, xlim=(m-0.01,m+sigma), xlabel="milliseconds", ylabel="count",label="",title = "C_bench")
 h2 = histogram(t2, bins=500, xlim=(m2-0.01,m2+sigma2), xlabel="milliseconds", ylabel="count",label="", title = "J_bench")
 h3 = histogram(t3, bins=500, xlim=(m3-0.01,m3+sigma3), xlabel="milliseconds", ylabel="count",label="",title = "Py_bench")
+h4 = histogram(t4, bins=500, xlim=(m4-0.01,m4+sigma4), xlabel="milliseconds", ylabel="count",label="",title = "Py_numpy_bench")
 
-display(plot(h,h2,h3,layout=(3,1),legend=false))
+display(plot(h,h2,h3,h4,layout=(2,2),legend=false))
+=#
 
-println("are all the sums the same?: $(c_sum(bignum) == sum(bignum) == pysum(bignum))")
+println("are all the sums the same?: $(c_sum(bignum) == sum(bignum) == py_sum(bignum) == py_numpy_bench(bignum))")
 println("difference between c_sum and j_sum: $(c_sum(bignum) - sum(bignum))")
 println("difference between c_sum and py_sum: $(c_sum(bignum) - py_sum(bignum))")
 println("difference between j_sums and py_sum: $(sum(bignum) - py_sum(bignum))")
+println("difference between c_sum and numpy_sum: $(c_sum(bignum) - numpy_sum(bignum))")
+println("difference between j_sum and numpy_sum: $(sum(bignum) - numpy_sum(bignum))")
+
+#=
+  multiple dispatch! -> generalization of single dispatch
+
+  OOP -> classes -> class methods. Only defined functions can be called on an object (single dispatch)
+
+  Multiple dispatch -> infers types of inputs and select appropriate method (most specific)
+=#
+println("\n"^5)
+
+#Julia determines which inputs make sense and which do not
+f(x) = x^2
+@show f(10)
+#@show f([1,2,3]) no method matching
+
+#explicitly naming the types
+foo(x::String, y::String) = println("inputs x and y are both strings!")
+foo("hi", "hello")
+foo(x::Int, y::Int) = println("inputs x and y are both integers!")
+foo(3,4)
+
+#a generic function is an abstract concept associated with a function 
+#-> '+' represents the concept of addition
+#a method is a specific implementation of a generic function for particular argument types
+
+foo(x::Number, y::Number) = println("My inputs x and y are both numbers!")
+foo(3.0,3.0) #Number includes floating points, complex numbers, integers etc. 
+
+#fallback method (duck typed) -> input type of any
+foo(x,y) = println("I accept any input types")
+v = rand(3)
+foo(v,v) #
+
+
+@show methods(foo)
+#@show methods(+)
+
+
+#=
+  Linear Algebra - basics of working with matrices and vectors
+=#
+println("\n"^5)
+################################ matrices ###################################
+
+mat = rand(1:4,3,3)
+@show mat
+@show typeof(mat) #Matrix{Int64}
+
+################################# Vector ####################################
+vect = fill(1.0,(3,)) # = fill(1.0,3)
+@show vect; @show typeof(vect) #Vector{Float64} 
+
+###multiplication###
+res = mat*vect
+@show res; @show typeof(res) #Vector{Float64}
+
+###transposition###
+@show mat'; @show transpose(mat)
+println("mat' and transpose(mat) are equivalent? $(mat' == transpose(mat))")
+
+###transposed multiplication###
+@show mat'mat # = mat'*mat #inner product
+
+###solving linear systems###
+# Given A and b, Ax = b x is solved by '\'
+@show mat\res
+
+# returns LCM solution if we have an overdetermined linear system (tall matrix)
+maTall = rand(3,2)
+@show maTall; @show maTall\res
+
+# returns minimun norm least squares solution for rank-deficient probelms
+@show matDef = rand(3)
+@show rankdef = hcat(matDef,matDef) #concatenate two vectors together
+@show rankdef\res 
+
+# returns minimum norm solution if we have an overdetermined aolution (short matrix)
+bshort() = rand(2)
+Ashort() = rand(2,3)
+@show Ashort()\bshort()
+
+#=
+  Factorization
+  Special matrix structures
+  Generic linear algebra
+=#
+println("\n"^5)
+
+mmat = rand(3,3)
+vvect = fill(1,(3,1))
+@show rres = mmat*vvect
+
+#=
+PA = LU ,where P is a permutation matrix, L is lower triangular unit diagonal and U is upper triangular, using lufact
+Julia allow computing LU factorization and defines a composite factorization type for storing it
+=#
+mmat_lu = lu(mmat)
+@show mmat_lu; @show typeof(mmat_lu)
+
+#different parts of the factor can be accessed
+@show mmat_lu.P; @show mmat_lu.L; @show mmat_lu.U
+
+#julia can dispatch methods on factorization objects
+@show mmat\rres; @show mmat_lu\rres; @show mmat\rres == mmat_lu\rres
+
+####determinants###
+@show det(mmat); @show det(mmat_lu)
+
+#=
+A = QR ,where Q is unitary/orthogonal and R is upper triangular, using qrfact
+=#
+
+mmat_qr = qr(mmat)
+@show mmat_qr.Q; @show mmat_qr.R
+
+#= Eigen decompositions
+  results from:
+    - eigen decompositions
+    - single value decompositions
+    - Hessenberg factorizations
+    - Schur decompostions
+  
+  all stored in Factorization types
+=#
+mmat_sym = mmat + mmat'
+mmat_symEig = eigen(mmat_sym) 
+@show mmat_symEig.values; @show mmat_symEig.vectors
+
+#we can dispatch specialized functions that exploit the properties of factorization
+@show inv(mmat_symEig)*mmat_sym 
+
+#= Special Matrix structures
+=#
+println("\n"^5)
+sp_mat = randn(1000,1000)
+
+#julia infers special matrix structure
+smat_sym = sp_mat + sp_mat'
+@show issymmetric(smat_sym)
+
+#sometimes theres floating point errors
+smat_sym_noisy = copy(smat_sym)
+smat_sym_noisy[1,2] += 5eps()
+@show issymmetric(smat_sym_noisy)
+
+# we can declare explicitly with: Diagonal, Triangular, Symmetric, Hermitian, Tridiagonal, SymTridiagonal
+smat_exp = Symmetric(smat_sym_noisy)
+
+#compare performance of different symetric matrices - when julia knows a matrix is symmetric:  eigval calculations are ~5-10x faster
+@show (@benchmark eigvals(smat_sym)); @show (@benchmark eigvals(smat_sym_noisy)); @show (@benchmark eigvals(smat_exp))
+
+#this problem would not be possible to solve on a laptop if an entire matrix had to be stored; special matrices with special structures helps julia use memory more efficiently
+numb = 1_000_000 #underscores are just for readability
+symat = SymTridiagonal(randn(numb),randn(numb-1))
+@show (@benchmark eigmax(symat))
+
+
+#Generic Linear Algebra - use '//'
+println("\n"^5)
+@show 1//2; @show typeof(1//2)
+
+mat_rat = Matrix{Rational{BigInt}}(rand(1:10,3,3))/10
+mat_vect = fill(1,3)
+@show result = mat_rat*mat_vect
+@show mat_rat\result
+
+@show lu(mat_rat)
+
+#can use rational numbers in 
 println("done")
+
+
 while true
-  #exit()
-  sleep(1)
+  exit()
+  #sleep(1)
 end
 
 
