@@ -1,4 +1,94 @@
-***Introduction into YOLO v3***
+*** YOLO ***
+URL: https://www.youtube.com/watch?v=2hAiJe8ITsE&list=WL&index=6
+
+input: image
+output: image with a bounding box (BB), label and confidence value
+
+steps:
+  1. divide image into grid(matrix) of sxs "cells"
+  2. each cell is responsible for predicting BB's 
+    - center of BB must be in cell, otherwise the box can overlap with other cells
+  3. return BB's above a minimum threshold
+
+how bounding boxes are encoded?
+  for each cell the CNN predicts a vector y which contains:
+    BB properties: 
+      pc: probability bounding box contains an object
+      1. (bx,by) = center coordinates, 
+      2. (bw,bh) = width,height of BB as percent of cells width and height
+    c1...cn: probability that cell belongs to classes 1...n (not BB specific)
+
+what about multiple BBs?
+  if we are predicting more than 1 BB per cell -> augment the vector y (concat BB1...BBn)
+    -(pc,BB1,...,BBn,c1,...,cn) -> in total y has 5B+c elements, B = # of BB, c = # of classes
+
+total size of output tensor (3D matrix) = S*S*(5B+c) 
+
+Performance? 
+  - union over intersection (UoI) -> measures overlap between bounding boxes
+  - UoI calculates between predicted BB and ground truth (prelabeled data)
+
+UoI = Area of intersection / Area of Union. 1 = best, 0 = worst
+
+Double counting:
+  non-max suppression removes BB with lower confidences that share a label and are above a certain threshold -> max(pred.label)
+
+implementaion:
+  - darknet framework trained on ImageNET as feature extractor
+  - modified by adding 4 conv. layers and 2 fully connected layers. 
+  - 24 total conv layers, 2 fully connected = 26 total layers 
+
+restraint: imput img must be size (448x448)
+
+
+
+
+
+
+
+
+
+*** YOLO 9000 (v2)***
+URL: https://www.youtube.com/watch?v=GBu2jofRJtk&list=WL&index=6
+
+Yolo_v1:
+Anchor boxes: predicts offset from a pre-given box -> YOLO uses soft-max suppression so the offsets tend to be relatively close to anchor boxes. 
+
+Yolo_v2:
+To make learning for the network easier, instead of uses pre-defined anchor boxes at different scales:
+  - k-means clustering predict offset according to aspect ratio (1:1,2:1,1:3 etc) 
+  - images tend to have basic bounding box shapes (better base predictions)
+  - 5 BB generates instead of usual 9 Anchor boxes -> easier to train
+  - +5% mean average precision (mAP)
+
+Training:
+  - Mutli-scale training -> train on images of differing dimensions (multiples of 32) 
+  - randomly resized every 10 batches (help with overfitting?)
+  - +1.5% mAP
+
+tradeoffs:  
+dimensions |^|: FPS |v| , mAP |^| --> @608x608: mAP ~ 80, FPS ~ 40
+dimensions |v|: FPS |^| , mAP |v| --> @320x320: mAP ~ 70, FPS ~ 90
+
+9000 classifications:
+-combines ImageNET and COCO datasets using miminum spanning tree of WordNet => WordTree.
+-WordTree is used to hierachically organize the labels. 
+-Ex. COCO label airplane has ImageNet leaves: biplane, jet, airbus, stealth fighter etc.
+
+*note*: images part of ImageNET cannot be judged on BB's since they dont contain them
+
+implementation:
+  - Darknet19 -> 19 conv. layers, 5 max pool layers = 24 total layers (feature extractor)
+
+
+
+
+
+
+
+
+
+*** YOLO v3 ***
 URL: https://www.youtube.com/watch?v=vRqSO6RsptU&list=WL&index=1&t=1s
 
 predicts classes
@@ -34,7 +124,9 @@ Input:
   restraints: 
     - (width, height % 32 == 0) == true.
      
-###Darknet -> 106 layers -> detection kernels + downsampling layers -> 82,94,108###
+***Feature extractor***
+Variant of Darknet53 (53 conv layers + residual/short-cut connections) is used.
+  - 106 full conv. NN (FCNN) -> detection kernels + downsampling  @ layers 82,94,106
 
 ***Downsampling:***
 input: 32 @ layer 82, 16 @ layer 94 , 8 @ layer 108 ("network strides")
@@ -54,14 +146,13 @@ output size: network_size./stride
 
   - produce feature maps that encode the attributes
       shape: (13,13,255), (26,26,255), (52,52,255) for COCO
-      
       A bounding box (BB) is predicted if the cell in the center of the box belongs to the receptive field
 
 ***Training***
 *COCO*:: default BB ("anchors" or "priors") calculated using k-means clustering.
   @ layer 82 ->  BB1:(116x90), BB2:(156x198), BB3:(373x326) -> number of predictions: 507
   @ layer 94 ->  BB1:(30x61), BB2:(62x45), BB3:(59x119) -> number of predictions: 2028
-  @ layer 108 ->  BB1:(10x13), BB2:(16x30), BB3:(33x23) -> number of predictions: 8112
+  @ layer 106 ->  BB1:(10x13), BB2:(16x30), BB3:(33x23) -> number of predictions: 8112
 
 9 total BB, 10647 total predictions for input 416x416 using COCO
 
@@ -76,8 +167,8 @@ how do we assign best prediction? extract probabilities
   - return prediction
 
 Forward Pass:
-yolov3 calculates offsets of width and height to these predefined anchors (log-space transform). 
-helps eliminate unstable gradients
+yolov3 calculates offsets of width and height to these predefined anchors (log-space transform). Helps eliminate unstable gradients
+
   width = pw * e^(th) 
   height = ph * e^(tw)
 
@@ -97,10 +188,10 @@ cx, cy, pw and ph have to be normalized:
 
 **Summary***
   - Applies CNN to image
-  - Sownsamples image at 3 scales
+  - Downsamples image at 3 scales
   - 1x1 detection kernels are applied to grid cells at 3 scales
   - 1 cell is responsible for detecting 1 object - 9 BB used (anchors - 3 for each scale)
-  - 10647 BB predicted
+  - 10647 BB predicted (13*13+26*26+52*52*3)
 
 
 
@@ -109,5 +200,5 @@ cx, cy, pw and ph have to be normalized:
 
 
 
-***YOLO object detection***
-URL: https://www.youtube.com/watch?v=2hAiJe8ITsE&list=WL&index=6
+
+
