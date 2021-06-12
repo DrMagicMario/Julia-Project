@@ -1,0 +1,113 @@
+***Introduction into YOLO v3***
+URL: https://www.youtube.com/watch?v=vRqSO6RsptU&list=WL&index=1&t=1s
+
+predicts classes
+detects multiple objects 
+locations
+
+single NN -> divides img into grid -> assigns cell probabilities -> predicts bounding boxes for detected object 
+
+Terminology:
+  - CNN
+  - Residual Blocks
+  - Skip connections
+  - Up-sampling
+  - Leaky ReLu
+  - IoU
+  - Non-maximum suppression
+   
+Architecture:
+ - 53 CNN layers (Darknet-53) stacked with
+ - 53 layers
+ = 106 layers
+
+  - each layer is followed by batch normalization and Leaky ReLu 
+  - no pooling: 53 layers are used with stride 2 to downsample feature maps -> prevents loss of low level features (also helps with detection of smaller objects).
+
+  *pooling only uses some values of the CNN to downsample but using the CNN itself maintains all the information
+
+Input:
+  - batch of images with shape (n=number_of_images,416=width,416=height,3=channels=RGB)
+  - tuple (width,height) = network size
+  - images do not need to be resized
+
+  restraints: 
+    - (width, height % 32 == 0) == true.
+     
+###Darknet -> 106 layers -> detection kernels + downsampling layers -> 82,94,108###
+
+***Downsampling:***
+input: 32 @ layer 82, 16 @ layer 94 , 8 @ layer 108 ("network strides")
+
+output size: network_size./stride 
+  - input->416x416, stride=32, output=416/32=13, output->13x13 **** detects large objects
+  - input->416x416, stride=16, output=416/16=26, output->26x26 **** detects med. objects
+  - input->416x416, stride=8, output=416/8=52, output->52x52 **** detects small objects
+
+***Detection Kernels***
+  - 1x1 -> output size= network_size./stride
+      shape: b*(5+c), b=3,
+          - b is the number of bounding boxes that each cell of produced feature map can predict. 
+          - Each box has 5+c attributes. 
+        
+      COCO = 80 classes - > 5+c = 85; therfore for COCO: 3*85 = 255 attributes
+
+  - produce feature maps that encode the attributes
+      shape: (13,13,255), (26,26,255), (52,52,255) for COCO
+      
+      A bounding box (BB) is predicted if the cell in the center of the box belongs to the receptive field
+
+***Training***
+*COCO*:: default BB ("anchors" or "priors") calculated using k-means clustering.
+  @ layer 82 ->  BB1:(116x90), BB2:(156x198), BB3:(373x326) -> number of predictions: 507
+  @ layer 94 ->  BB1:(30x61), BB2:(62x45), BB3:(59x119) -> number of predictions: 2028
+  @ layer 108 ->  BB1:(10x13), BB2:(16x30), BB3:(33x23) -> number of predictions: 8112
+
+9 total BB, 10647 total predictions for input 416x416 using COCO
+
+how do we assign best prediction? extract probabilities
+  - compute element wise product of objectness scores and confidences.
+    * p0 = objectness score: 1 = center cell, 0 = corner cell (probability that cell contains an object)
+      ** Pobject * IoU -> sigmoid(t0) -> p0, 
+        Pobject = probability BB contains object
+        Intersection over union (IoU) = (BB1 n BB2)/(BB1 u BB2), BB2 = predicted, BB1 = ground truth
+    * p1,p2,...,pc = confidences for each class of object
+  - find max(probabilities)
+  - return prediction
+
+Forward Pass:
+yolov3 calculates offsets of width and height to these predefined anchors (log-space transform). 
+helps eliminate unstable gradients
+  width = pw * e^(th) 
+  height = ph * e^(tw)
+
+yolov3 calculates the center coordinate of a bounding box using the sigmoid function 
+  x = sigmoid(tx) + cx
+  y = sigmoid(ty) + cy
+
+cx, cy = top left coordinate of anchor box
+tx,ty,tw,th = output of NN
+pw,ph = anchor box width and height
+
+cx, cy, pw and ph have to be normalized:
+  cx = cx/width
+  cy = cy/height
+  pw = pw/width
+  py = py/height
+
+**Summary***
+  - Applies CNN to image
+  - Sownsamples image at 3 scales
+  - 1x1 detection kernels are applied to grid cells at 3 scales
+  - 1 cell is responsible for detecting 1 object - 9 BB used (anchors - 3 for each scale)
+  - 10647 BB predicted
+
+
+
+
+
+
+
+
+***YOLO object detection***
+URL: https://www.youtube.com/watch?v=2hAiJe8ITsE&list=WL&index=6
