@@ -268,8 +268,7 @@ Basic Architecture of Common object detector:
 
 ########## Architecture of YoloV4  ##########
 
-Backbone: 
-  Cross-Stage Partial Connection Darkent53 (CSPDarknet53) -> seperates a layer in 2, one goes through CNN and the other path goes through a DenseNet. The results are aggregated before passing it to the next layer. Earlier in 2016 a DenseNet was proposed but it was found the these DenseNets contain duplicate information and thus CSP was born.
+Backbone: CSPDarknet53
 
   Training: 
     * Data Augmentation
@@ -283,6 +282,7 @@ Backbone:
       ** Activation function
         *** Mish activation
     * Cross-stage partial connections (CSP)
+      - Splits layer in 2, 1 -> CNN, 2 -> Dense block. The results are aggregated before passing it to the next layer. 
     * Multi-input weighted residual connections (MiWRC)
 
 Neck (Detector): SPP + PANet
@@ -303,9 +303,10 @@ Neck (Detector): SPP + PANet
       ** Anchored
         *** NMS, Soft-NMS, DIoU NMS, CIoU NMS
     * Enlarging receptive Field
-      ** SPP
+      ** Spatial Pyramid Pool (SPP)
     * Attention module
      ** Spatial-wise 
-      *** Special Attention Module (SAM/PAN)
+      *** Special Attention Module (SAM)
+      *** Path Aggregation Netwrok (PAN)
 
 Head: YOLOv3
