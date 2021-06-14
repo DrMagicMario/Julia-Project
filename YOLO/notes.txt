@@ -201,4 +201,111 @@ cx, cy, pw and ph have to be normalized:
 
 
 
+*** YOLO v4 ***
+URL: https://www.youtube.com/watch?v=bDK9NRF20To&list=WL&index=5&t=15s
 
+Basic Architecture of Common object detector:
+
+  1. Inputs: Image, Patches, Image Pyramid
+  2. Backbones: VGG16, ResNet-50, SpineNet, EfficientNet, CSPResNeXt50, CSPDarknet53
+  3. Neck (detector): 
+      -> additional blocks: SPP, ASPP, RFB, SAM
+      -> Path-aggregator blocks: PAN, FPN, NAS-FPN, Fully Connectd FPN, BiFPN, ASFF, SFAM
+  4. Head:
+      -> Dense Prediction (one-stage): RPN, SSD, YOLO, RetinaNet(anchor based), CornerNet, CenterNEt, MatrixNet, FCOS(anchor free)
+      -> Sparse prediction (two-stage): Faster R-CNN, R-FCN, Mask R-CNN (anchor based), RepPoints (anchor free)
+
+########## training strategies for improved learning with more training cost ##########
+
+  * Normalization of activations by mean and variance
+    ** Batch normalization (BN), Cross-GPU (CGBN or SyncBN), Filter Response (FPN), Cross-iteration (CBN)
+
+  * Regularization (feature map)
+    ** Object occlusion
+      *** Ease, CutOut, Zero mask, Grid mask, DropOut, DropConnect, DropBlock (all very similar)
+
+  * Data Augmentation
+    ** object occlusion
+    ** GAN
+    ** Multiple Images
+    ** Single Image
+      *** Photometric distortions
+        **** Brightness, Contrast, Hue, Saturation, Noise
+      *** Geometric distortions
+        **** Scaling, Cropping, Flipping, Rotating
+
+  * Data Imbalance
+    ** Two-stage detector
+      *** Hard negative example mining, Online hard example mining
+    ** Focal loss
+
+  * Degree of associative between categories
+    ** Softlabel (label smoothing), Label refinement network (knowledge distillation)
+
+  * Objective function of BB regression
+    ** IoU loss, GIoU (shape + orientation), DIoU loss (distance + shape + orientation)
+
+
+########## Plugin/Post-processing to improve accuracy with low inference cost  ##########
+
+  * Enlarging receptive Field
+    ** SPP, ASPP, RFB
+
+  * Attention module
+   ** Channel-wise
+    *** Squeeze-and-Excitation (SE)
+   ** Spatial-wise 
+    *** Special Attention Module (SAM)
+
+  * Feature integration
+    ** Skip-connection, Hyper-column, FPN, SFAM, ASFF, BiFPN
+
+  * Post-processing
+    ** Activation function
+      *** ReLU, LReLU, PreLU, ReLU6, SELU, Swish, Hard-Swish, Mish 
+    ** Anchored
+      *** NMS, Soft-NMS, DIoU NMS, CIoU NMS
+
+########## Architecture of YoloV4  ##########
+
+Backbone: 
+  Cross-Stage Partial Connection Darkent53 (CSPDarknet53) -> seperates a layer in 2, one goes through CNN and the other path goes through a DenseNet. The results are aggregated before passing it to the next layer. Earlier in 2016 a DenseNet was proposed but it was found the these DenseNets contain duplicate information and thus CSP was born.
+
+  Training: 
+    * Data Augmentation
+      ** Mosaic, CutMix
+    * Regularization (feature map)
+      ** DropBlock
+    * Degree of associative between categories
+      ** Class label smoothing
+  Accuracy:
+    * Post-processing
+      ** Activation function
+        *** Mish activation
+    * Cross-stage partial connections (CSP)
+    * Multi-input weighted residual connections (MiWRC)
+
+Neck (Detector): SPP + PANet
+  Training: 
+    * Data Augmentation
+      ** Mosaic, Self-Adversarial
+    * Objective function of BB regression
+      ** CIoU-loss, 
+    * Eliminate grid sensitivity
+    * Multiple achors for single ground truth
+    * Cosine annealing scheduler
+    * Optimal hyper-parameters
+    * Random training shapes
+  Accuracy:
+    * Post-processing
+      ** Activation function
+        *** Mish activation
+      ** Anchored
+        *** NMS, Soft-NMS, DIoU NMS, CIoU NMS
+    * Enlarging receptive Field
+      ** SPP
+    * Attention module
+     ** Spatial-wise 
+      *** Special Attention Module (SAM/PAN)
+
+Head: YOLOv3
