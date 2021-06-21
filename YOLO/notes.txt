@@ -1,6 +1,29 @@
 *** YOLO ***
 URL: https://www.youtube.com/watch?v=2hAiJe8ITsE&list=WL&index=6
+     https://www.youtube.com/watch?v=n9_XyCGr-MI&list=WL&index=2&t=956s
 
+PASCAL VOC Dataset -> use COCO instead
+
+
+Idea:
+  *split image into 7x7 cell and predict a BB and label for each cell
+    **label format: [c1,c2,...,cn,Pc,x,y,w,h]
+      ***c1 ... cn -> number of classes
+      ***Pc -> probability there is object (constrained between 0 and 1)
+      ***x,y,w,h -> Bounding Box coordinates
+  *only cells responsible for predicting a BB are the ones containing the "center" point of the object being detected
+    **output 2 BB (each will specialize to output differing BB ratios (tall vs wide)
+    **base coordinates of each cell is the top left corner (0,0) to bottom right corner (1,1)
+      ***each output and label will be relative to the cell:
+        ****format: [x,y,w,h]
+        ****x,y -> object midpoint (constrained between 0 and 1 i.e within the cell) 
+        ****w,h -> width,height relative to midpoint (not contrained i.e overlaps cells)
+          
+
+Model:
+
+Loss Function:
+     
 input: image
 output: image with a bounding box (BB), label and confidence value
 
