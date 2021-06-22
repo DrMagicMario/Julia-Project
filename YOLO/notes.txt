@@ -12,15 +12,39 @@ Idea:
       ***Pc -> probability there is object (constrained between 0 and 1)
       ***x,y,w,h -> Bounding Box coordinates
   *only cells responsible for predicting a BB are the ones containing the "center" point of the object being detected
-    **output 2 BB (each will specialize to output differing BB ratios (tall vs wide)
+    **output n BB (each will specialize to output differing BB ratios (tall vs wide)
+      ***format with 2 BB's: [c1,c2,...,cn,Pc1,x1,y1,w1,h1,Pc2,x2,y2,w2,h2]
+      ***note that a cell only has 1 set of class predictions regardless of the number of BB's, thus only one object can be detected per cell. 
     **base coordinates of each cell is the top left corner (0,0) to bottom right corner (1,1)
       ***each output and label will be relative to the cell:
         ****format: [x,y,w,h]
         ****x,y -> object midpoint (constrained between 0 and 1 i.e within the cell) 
         ****w,h -> width,height relative to midpoint (not contrained i.e overlaps cells)
           
+Target shape of image: (s,s,25) -> 5B+c = 5(2)+20 = 25
+Target prediction of image: (s,s,30) -> 25+5(B)=25+5(1)=30
 
 Model:
+  *input: shape 448 x 448 x 3(RGB imgs)
+
+Conv.(7x7x64),stride=2 -> maxpool(2x2),stride=2
+Conv.(3x9x192) -> maxpool(2x2),stride=2
+Conv.[(1x1x128),
+     (3x3x256),
+     (1x1x256),
+     (3x3,512)] -> maxpool(2x2),stride=2
+Conv.[(1x1x256),  -| x4
+     (3x3x512),   -|
+     (1x1x512),
+     (3x3,1024)] -> maxpool(2x2),stride=2
+Conv.[(1x1x512),  -| x2
+     (3x3x1024),  -|
+     (3x3,1024),
+     (3x3x1024),stride=2]
+Conv.[(3x3x1024),
+     (3x3x1024)]
+Conn.(7x7x1024) <-linear (4096)-> (7x7x30)
+
 
 Loss Function:
      
